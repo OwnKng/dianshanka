@@ -2,86 +2,80 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
+
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+type statusMsg int
+type errorMsg struct{ err error }
+
 type model struct {
-	choices  []string
-	cursor   int
-	selected map[int]struct{}
+	status int
+	err    error
 }
 
 func initialModel() model {
-	return model{
-		choices:  []string{"Buy carrots", "Buy celery", "Buy beer"},
-		selected: make(map[int]struct{}),
-	}
+	return model{}
 }
 
 func (m model) Init() tea.Cmd {
 
-	return nil
+	return checkServer
 }
 
-func (m model) View() string {
-	s := "What should we buy at the market?\n\n"
+const url = "https://ownkng.dev"
 
-	for i, choice := range m.choices {
+func checkServer() tea.Msg {
 
-		cursor := " "
+	c := &http.Client{Timeout: 10 * time.Second}
+	res, err := c.Get(url)
 
-		if m.cursor == i {
-			cursor = ">"
-		}
-
-		checked := " "
-
-		if _, ok := m.selected[i]; ok {
-			checked = "x"
-		}
-
-		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice)
+	if err != nil {
+		return errorMsg{err}
 	}
 
-	s += "\nPress q to quick.\n"
-
-	return s
+	return statusMsg(res.StatusCode)
 }
+
+func (e errorMsg) Error() string { return e.err.Error() }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
+	case statusMsg:
+		m.status = int(msg)
+		return m, tea.Quit
+
+	case errorMsg:
+		m.err = msg
+		return m, tea.Quit
+
 	case tea.KeyMsg:
 
-		switch msg.String() {
-		case "ctrl+c", "q":
+		if msg.Type == tea.KeyCtrlC {
 			return m, tea.Quit
-
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-
-		case "down", "j":
-			if m.cursor < len(m.choices)-1 {
-				m.cursor++
-			}
-
-		case "enter", " ":
-			_, ok := m.selected[m.cursor]
-
-			if ok {
-				delete(m.selected, m.cursor)
-			} else {
-				m.selected[m.cursor] = struct{}{}
-			}
-
 		}
 	}
 
 	return m, nil
+}
+
+func (m model) View() string {
+	if m.err != nil {
+		return fmt.Sprintf("\n We had some trouble: %v\n\n", m.err)
+	}
+
+	s := fmt.Sprintf("Checking %s ...", url)
+
+	if m.status > 0 {
+		s += fmt.Sprintf("%d %s!", m.status, http.StatusText(m.status))
+	}
+
+	return "\n" + s + "\n\n"
 }
 
 func main() {
