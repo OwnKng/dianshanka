@@ -2,91 +2,127 @@ package main
 
 import (
 	"fmt"
-	"net/http"
+	"io"
 	"os"
+	"strings"
 
-	"time"
-
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-type statusMsg int
-type errorMsg struct{ err error }
+const listHeight = 14
 
-type model struct {
-	status int
-	err    error
+var (
+	titleStyle        = lipgloss.NewStyle().MarginLeft(2)
+	itemStyle         = lipgloss.NewStyle().PaddingLeft(4)
+	selectedItemStyle = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color("170"))
+	paginationStyle   = list.DefaultStyles().PaginationStyle.PaddingLeft(4)
+	helpStyle         = list.DefaultStyles().HelpStyle.PaddingLeft(4).PaddingBottom(1)
+	quitTextStyle     = lipgloss.NewStyle().Margin(1, 0, 2, 4)
+)
+
+type item string
+
+func (i item) FilterValue() string { return "" }
+
+type itemDelegate struct{}
+
+func (d itemDelegate) Height() int                             { return 1 }
+func (d itemDelegate) Spacing() int                            { return 0 }
+func (d itemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
+func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
+	i, ok := listItem.(item)
+	if !ok {
+		return
+	}
+
+	str := fmt.Sprintf("%d. %s", index+1, i)
+
+	fn := itemStyle.Render
+	if index == m.Index() {
+		fn = func(s ...string) string {
+			return selectedItemStyle.Render("> " + strings.Join(s, " "))
+		}
+	}
+
+	fmt.Fprint(w, fn(str))
 }
 
-func initialModel() model {
-	return model{}
+type model struct {
+	list     list.Model
+	choice   string
+	quitting bool
 }
 
 func (m model) Init() tea.Cmd {
-
-	return checkServer
+	return nil
 }
-
-const url = "https://ownkng.dev"
-
-func checkServer() tea.Msg {
-
-	c := &http.Client{Timeout: 10 * time.Second}
-	res, err := c.Get(url)
-
-	if err != nil {
-		return errorMsg{err}
-	}
-
-	return statusMsg(res.StatusCode)
-}
-
-func (e errorMsg) Error() string { return e.err.Error() }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-
-	case statusMsg:
-		m.status = int(msg)
-		return m, tea.Quit
-
-	case errorMsg:
-		m.err = msg
-		return m, tea.Quit
+	case tea.WindowSizeMsg:
+		m.list.SetWidth(msg.Width)
+		return m, nil
 
 	case tea.KeyMsg:
+		switch keypress := msg.String(); keypress {
+		case "q", "ctrl+c":
+			m.quitting = true
+			return m, tea.Quit
 
-		if msg.Type == tea.KeyCtrlC {
+		case "enter":
+			i, ok := m.list.SelectedItem().(item)
+			if ok {
+				m.choice = string(i)
+			}
 			return m, tea.Quit
 		}
 	}
 
-	return m, nil
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
 }
 
 func (m model) View() string {
-	if m.err != nil {
-		return fmt.Sprintf("\n We had some trouble: %v\n\n", m.err)
+	if m.choice != "" {
+		return quitTextStyle.Render(fmt.Sprintf("%s? Sounds good to me.", m.choice))
 	}
-
-	s := fmt.Sprintf("Checking %s ...", url)
-
-	if m.status > 0 {
-		s += fmt.Sprintf("%d %s!", m.status, http.StatusText(m.status))
+	if m.quitting {
+		return quitTextStyle.Render("Not hungry? That’s cool.")
 	}
-
-	return "\n" + s + "\n\n"
+	return "\n" + m.list.View()
 }
 
 func main() {
-
-	p := tea.NewProgram(initialModel())
-
-	_, err := p.Run()
-
-	if err != nil {
-		fmt.Printf("Alas, there's been an error: %v", err)
-		os.Exit(1)
+	items := []list.Item{
+		item("Ramen"),
+		item("Tomato Soup"),
+		item("Hamburgers"),
+		item("Cheeseburgers"),
+		item("Currywurst"),
+		item("Okonomiyaki"),
+		item("Pasta"),
+		item("Fillet Mignon"),
+		item("Caviar"),
+		item("Just Wine"),
 	}
 
+	const defaultWidth = 20
+
+	l := list.New(items, itemDelegate{}, defaultWidth, listHeight)
+	l.Title = "What do you want for dinner?"
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(false)
+	l.Styles.Title = titleStyle
+	l.Styles.PaginationStyle = paginationStyle
+	l.Styles.HelpStyle = helpStyle
+
+	m := model{list: l}
+
+	if _, err := tea.NewProgram(m).Run(); err != nil {
+		fmt.Println("Error running program:", err)
+		os.Exit(1)
+	}
 }
