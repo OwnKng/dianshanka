@@ -2,80 +2,69 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"ownkng.dev/cli/types"
+	"ownkng.dev/cli/vocab"
 )
 
-const listHeight = 14
+const listHeight = 10
 
-var (
-	titleStyle        = lipgloss.NewStyle().MarginLeft(2)
-	itemStyle         = lipgloss.NewStyle().PaddingLeft(4)
-	selectedItemStyle = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color("170"))
-	paginationStyle   = list.DefaultStyles().PaginationStyle.PaddingLeft(4)
-	helpStyle         = list.DefaultStyles().HelpStyle.PaddingLeft(4).PaddingBottom(1)
-	quitTextStyle     = lipgloss.NewStyle().Margin(1, 0, 2, 4)
-)
-
-type item string
-
-func (i item) FilterValue() string { return "" }
-
-type itemDelegate struct{}
-
-func (d itemDelegate) Height() int                             { return 1 }
-func (d itemDelegate) Spacing() int                            { return 0 }
-func (d itemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
-func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
-	i, ok := listItem.(item)
-	if !ok {
-		return
-	}
-
-	str := fmt.Sprintf("%d. %s", index+1, i)
-
-	fn := itemStyle.Render
-	if index == m.Index() {
-		fn = func(s ...string) string {
-			return selectedItemStyle.Render("> " + strings.Join(s, " "))
-		}
-	}
-
-	fmt.Fprint(w, fn(str))
+type item struct {
+	title string
+	desc  string
 }
 
-type model struct {
+func (i item) Title() string       { return i.title }
+func (i item) Description() string { return i.desc }
+func (i item) FilterValue() string { return i.title }
+
+type Styles struct {
+	BorderColor lipgloss.Color
+}
+
+func DefaultStyles() *Styles {
+	s := new(Styles)
+	s.BorderColor = lipgloss.Color("#FF00FF")
+
+	return s
+}
+
+type Main struct {
+	index    int
+	width    int
+	height   int
+	complete bool
+	styles   *Styles
 	list     list.Model
 	choice   string
-	quitting bool
+	game     types.Game
 }
 
-func (m model) Init() tea.Cmd {
+func (m Main) Init() tea.Cmd {
 	return nil
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Main) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.list.SetWidth(msg.Width)
-		return m, nil
 
+	//_ Handle resize events
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+
+	//_ Handle key events
 	case tea.KeyMsg:
-		switch keypress := msg.String(); keypress {
+		switch msg.String() {
 		case "q", "ctrl+c":
-			m.quitting = true
+
 			return m, tea.Quit
 
 		case "enter":
-			i, ok := m.list.SelectedItem().(item)
-			if ok {
-				m.choice = string(i)
-			}
+
 			return m, tea.Quit
 		}
 	}
@@ -85,44 +74,54 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) View() string {
-	if m.choice != "" {
-		return quitTextStyle.Render(fmt.Sprintf("%s? Sounds good to me.", m.choice))
-	}
-	if m.quitting {
-		return quitTextStyle.Render("Not hungry? That’s cool.")
-	}
-	return "\n" + m.list.View()
+func (m Main) View() string {
+	current := m.game.Rounds[m.index]
+
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			current.Character,
+			m.list.View(),
+		),
+	)
 }
 
 func main() {
+	game := vocab.NewGame(10)
+	round := game.Rounds[0]
+
 	items := []list.Item{
-		item("Ramen"),
-		item("Tomato Soup"),
-		item("Hamburgers"),
-		item("Cheeseburgers"),
-		item("Currywurst"),
-		item("Okonomiyaki"),
-		item("Pasta"),
-		item("Fillet Mignon"),
-		item("Caviar"),
-		item("Just Wine"),
+		item{title: round.Cards[0].English, desc: round.Cards[0].Pinyin},
+		item{title: round.Cards[1].English, desc: round.Cards[1].Pinyin},
+		item{title: round.Cards[2].English, desc: round.Cards[2].Pinyin},
+		item{title: round.Cards[3].English, desc: round.Cards[3].Pinyin},
 	}
 
-	const defaultWidth = 20
-
-	l := list.New(items, itemDelegate{}, defaultWidth, listHeight)
-	l.Title = "What do you want for dinner?"
+	l := list.New(items, list.NewDefaultDelegate(), 20, 20)
+	l.Title = "Select the matching meaning"
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
-	l.Styles.Title = titleStyle
-	l.Styles.PaginationStyle = paginationStyle
-	l.Styles.HelpStyle = helpStyle
 
-	m := model{list: l}
+	m := Main{
+		index:    0,
+		width:    20,
+		height:   listHeight,
+		complete: false,
+		styles:   DefaultStyles(),
+		list:     l,
+		choice:   "",
+		game:     game,
+	}
 
-	if _, err := tea.NewProgram(m).Run(); err != nil {
-		fmt.Println("Error running program:", err)
+	programme := tea.NewProgram(m)
+	_, err := programme.Run()
+
+	if err != nil {
+		fmt.Println("Error creating program:", err)
 		os.Exit(1)
 	}
 }
