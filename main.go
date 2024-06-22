@@ -2,36 +2,97 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"os"
 
-	"github.com/charmbracelet/huh"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
-var(
-	name string 
-	beverage string
-)
+type model struct {
+	choices  []string
+	cursor   int
+	selected map[int]struct{}
+}
 
-func main() {
-	form := huh.NewForm(
-		huh.NewGroup(
-		huh.NewInput().Title("What's your name?").Value(&name),
-		),
-		huh.NewGroup(
-			huh.NewSelect[string]().Title("Chose beverage").Options(
-				huh.NewOption("Beer, please!", "beer"), 
-				huh.NewOption("Wine would be fine", "wine"),
-				huh.NewOption("Water, just water", "water"),
-			).Value(&beverage),
-		),
-	)
+func initialModel() model {
+	return model{
+		choices:  []string{"Buy carrots", "Buy celery", "Buy beer"},
+		selected: make(map[int]struct{}),
+	}
+}
 
-	err := form.Run()
+func (m model) Init() tea.Cmd {
 
-	if err != nil {
-		log.Fatal(err)
+	return nil
+}
+
+func (m model) View() string {
+	s := "What should we buy at the market?\n\n"
+
+	for i, choice := range m.choices {
+
+		cursor := " "
+
+		if m.cursor == i {
+			cursor = ">"
+		}
+
+		checked := " "
+
+		if _, ok := m.selected[i]; ok {
+			checked = "x"
+		}
+
+		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice)
 	}
 
-	fmt.Printf("Hey, %s!\n", name)
-	fmt.Printf("One %s, comming right up", beverage)
+	s += "\nPress q to quick.\n"
+
+	return s
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+
+	case tea.KeyMsg:
+
+		switch msg.String() {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+
+		case "down", "j":
+			if m.cursor < len(m.choices)-1 {
+				m.cursor++
+			}
+
+		case "enter", " ":
+			_, ok := m.selected[m.cursor]
+
+			if ok {
+				delete(m.selected, m.cursor)
+			} else {
+				m.selected[m.cursor] = struct{}{}
+			}
+
+		}
+	}
+
+	return m, nil
+}
+
+func main() {
+
+	p := tea.NewProgram(initialModel())
+
+	_, err := p.Run()
+
+	if err != nil {
+		fmt.Printf("Alas, there's been an error: %v", err)
+		os.Exit(1)
+	}
+
 }
