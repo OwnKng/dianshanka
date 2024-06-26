@@ -64,7 +64,6 @@ type Main struct {
 	keys   keyMap
 	help   help.Model
 	list   input.Input
-	choice string
 	game   vocab.Game
 	cursor int
 	reveal bool
@@ -182,7 +181,7 @@ func (m Main) View() string {
 		score := m.game.GetScore() * 100
 		content += lipgloss.JoinVertical(
 			lipgloss.Left,
-			secondaryText.Margin(3, 0, 3, 0).Render(fmt.Sprintf("Game complete. You scored %.2f%% \n", score)),
+			secondaryText.Margin(3, 0, 3, 0).Render(fmt.Sprintf("Game complete. You scored %.0f%% \n", score)),
 			helpView,
 		)
 
@@ -218,7 +217,8 @@ func (m Main) View() string {
 
 	content = content + lipgloss.JoinVertical(
 		lipgloss.Left,
-		flashcardStyles.MarginTop(3).Render(current.Card.Chinese),
+		secondaryText.MarginTop(3).Render(fmt.Sprintf("Round %d of %d", m.game.Round+1, m.game.NumberOfRounds)),
+		flashcardStyles.MarginTop(1).Render(current.Card.Chinese),
 		secondaryText.Margin(1, 0, 0, 0).Render("Select the correct English translation"),
 		cards,
 		reveal,
@@ -235,7 +235,7 @@ func (m Main) View() string {
 }
 
 func main() {
-	game := vocab.NewGame(5)
+	game := vocab.NewGame(10)
 	round := game.Rounds[0]
 
 	items := []input.Item{}
@@ -258,7 +258,6 @@ func main() {
 		width:  20,
 		height: listHeight,
 		list:   l,
-		choice: "",
 		game:   game,
 		cursor: 0,
 		help:   help.New(),
