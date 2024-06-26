@@ -12,8 +12,6 @@ import (
 	"ownkng.dev/cli/vocab"
 )
 
-const listHeight = 10
-
 type keyMap struct {
 	Up    key.Binding
 	Down  key.Binding
@@ -256,7 +254,7 @@ func main() {
 
 	m := Main{
 		width:  20,
-		height: listHeight,
+		height: 20,
 		list:   l,
 		game:   game,
 		cursor: 0,
