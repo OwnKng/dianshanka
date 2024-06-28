@@ -1,4 +1,4 @@
-module ownkng.dev/cli
+module ownkng.dev/hanzi
 
 go 1.22.4
 

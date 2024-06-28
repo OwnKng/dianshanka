@@ -8,8 +8,9 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"ownkng.dev/cli/input"
-	"ownkng.dev/cli/vocab"
+	"ownkng.dev/hanzi/input"
+	"ownkng.dev/hanzi/scorecard"
+	"ownkng.dev/hanzi/vocab"
 )
 
 type keyMap struct {
@@ -318,25 +319,36 @@ func (m Main) View() string {
 
 	if m.game.Complete {
 		//* Game is finished - render the score
-		score := m.game.GetScore() * 100
+		//score := m.game.GetScore() * 100
 
-		scoreCard := lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			"You scored ",
-			flashcardStyles.Render(fmt.Sprintf("%.f", score)),
-			" points.",
-		)
+		columns := []scorecard.Column{
+			{Title: "Chinese", Width: 20},
+			{Title: "Pinyin", Width: 20},
+			{Title: "English", Width: 20},
+			{Title: "Correct", Width: 20},
+		}
 
-		scoreCard = lipgloss.
-			NewStyle().
-			Width(50).
-			MarginTop(3).
-			Render(scoreCard)
+		rows := []scorecard.Row{}
+
+		for _, round := range m.game.Rounds {
+			card := round.Card
+
+			correct := "x"
+
+			if round.Correct {
+				correct = "✓"
+			}
+
+			rows = append(rows, scorecard.Row{card.Chinese, card.Pinyin, card.English, correct})
+
+		}
+
+		sc := scorecard.NewModel(rows, columns)
 
 		content += lipgloss.JoinVertical(
 			lipgloss.Left,
 			headingStyles.Render("下课!"),
-			scoreCard,
+			sc.Render(),
 			secondaryText.MarginTop(2).Render("Want to play again?"),
 			roundControls,
 			helpView,
