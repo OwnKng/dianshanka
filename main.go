@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"os"
 
+	"ownkng.dev/dianshanka/input"
+	"ownkng.dev/dianshanka/scorecard"
+	"ownkng.dev/dianshanka/vocab"
+
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"ownkng.dev/hanzi/input"
-	"ownkng.dev/hanzi/scorecard"
-	"ownkng.dev/hanzi/vocab"
 )
 
 type keyMap struct {
@@ -318,9 +319,9 @@ func (m Main) View() string {
 	current := m.game.Rounds[m.game.Round]
 
 	if m.game.Complete {
-		//* Game is finished - render the score
-		//score := m.game.GetScore() * 100
+		//* Game is finished - render the scorecard
 
+		//* Render the table
 		columns := []scorecard.Column{
 			{Title: "Chinese", Width: 20},
 			{Title: "Pinyin", Width: 20},
@@ -340,16 +341,18 @@ func (m Main) View() string {
 			}
 
 			rows = append(rows, scorecard.Row{card.Chinese, card.Pinyin, card.English, correct})
-
 		}
 
 		sc := scorecard.NewModel(rows, columns)
 
+		score := m.game.GetScore() * 100
+
 		content += lipgloss.JoinVertical(
 			lipgloss.Left,
 			headingStyles.Render("下课!"),
+			lipgloss.NewStyle().MarginTop(3).Render(fmt.Sprintf("You got %0.f%% of cards correct", score)),
 			sc.Render(),
-			secondaryText.MarginTop(2).Render("Want to play again?"),
+			lipgloss.NewStyle().MarginTop(2).Render("Want to play again?"),
 			roundControls,
 			helpView,
 		)

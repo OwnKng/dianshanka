@@ -1,4 +1,4 @@
-module ownkng.dev/hanzi
+module ownkng.dev/dianshanka
 
 go 1.22.4
 

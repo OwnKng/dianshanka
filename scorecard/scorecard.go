@@ -1,14 +1,12 @@
 package scorecard
 
 import (
-	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 )
 
 type Model struct {
-	viewport viewport.Model
-	rows     []Row
-	columns  []Column
+	rows    []Row
+	columns []Column
 }
 
 type Row []string
@@ -31,9 +29,8 @@ var text = lipgloss.
 
 func NewModel(rows []Row, columns []Column) *Model {
 	m := &Model{
-		viewport: viewport.New(0, 20),
-		rows:     rows,
-		columns:  columns,
+		rows:    rows,
+		columns: columns,
 	}
 
 	return m
@@ -76,7 +73,7 @@ func (m *Model) Render() string {
 
 	return lipgloss.
 		NewStyle().
-		Padding(0, 2, 1, 2).
+		Padding(0, 2, 0, 2).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(subduedColor).
 		Render(table)
